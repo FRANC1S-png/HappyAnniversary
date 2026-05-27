@@ -8,6 +8,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap" rel="stylesheet">
+    
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+
     <style>
         :root {
             --bg: #e4fffe;
@@ -31,6 +34,25 @@
             width: 100%;
             height: 100%;
             z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ตั้งค่ากล่องโมเดล 3D ให้ใหญ่เต็มจอและโปร่งใส */
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            opacity: 0;
+            transform: scale(0);
+            transition: opacity 1s ease, transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* คลาสสั่งให้โมเดลค่อยๆ ขยายใหญ่ตอนเปิดซองจดหมาย */
+        model-viewer.show {
+            opacity: 1;
+            transform: scale(1);
         }
 
         .disable-click {
@@ -81,7 +103,18 @@
 
 <body>
 
-    <div id="canvas-container" class="disable-click"></div>
+    <div id="canvas-container" class="disable-click">
+        <model-viewer 
+            id="flower-model"
+            src="hydrangea1.glb" 
+            alt="Hydrangea Flowers"
+            auto-rotate
+            camera-controls
+            interaction-prompt="none"
+            shadow-intensity="1">
+        </model-viewer>
+    </div>
+
     <canvas id="heart-rain-canvas"></canvas>
 
     <div class="envelope-wrapper" id="envelope-trigger">
@@ -90,91 +123,28 @@
         <div class="envelope-front"></div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-
     <script>
-        let scene, camera, renderer, myModel, controls;
-        let isModelReady = false;
+        let isModelReady = true; // ระบบใหม่พร้อมทำงานทันที
         let hasClickedFirework = false;
 
-        function init3D() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 5);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            
-            // ตั้งค่าสีมาตรฐานยุคใหม่ให้แสดงผลดอกไม้ได้ถูกต้อง
-            renderer.outputColorSpace = THREE.SRGBColorSpace; 
-            
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-
-            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-            const sun = new THREE.DirectionalLight(0xffffff, 1.5);
-            sun.position.set(5, 5, 5);
-            scene.add(sun);
-
-            // สั่งโหลดไฟล์ hydrangea1.glb ของคุณตรงๆ ได้เลย
-            const loader = new THREE.GLTFLoader();
-            loader.load('hydrangea1.glb', (gltf) => {
-                myModel = gltf.scene;
-                const box = new THREE.Box3().setFromObject(myModel);
-                const center = box.getCenter(new THREE.Vector3());
-                myModel.position.sub(center);
-                myModel.scale.set(0, 0, 0);
-                scene.add(myModel);
-            }, undefined, (error) => {
-                console.error("เกิดข้อผิดพลาดในการเปิดโมเดล: ", error);
-            });
-
-            animate();
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if (controls) controls.update();
-            if (myModel) {
-                myModel.rotation.y += 0.005;
-                myModel.position.y = Math.sin(Date.now() * 0.002) * 0.05;
-            }
-            renderer.render(scene, camera);
-        }
-
         const wrapper = document.getElementById('envelope-trigger');
+        const flowerModel = document.getElementById('flower-model');
+
+        // คลิกเปิดซองจดหมาย
         wrapper.addEventListener('click', () => {
             wrapper.classList.add('open');
             setTimeout(() => {
                 wrapper.classList.add('slide-down');
                 document.getElementById('canvas-container').classList.remove('disable-click');
-                showModel();
+                
+                // สั่งให้โมเดลขยายตัวเด้งขึ้นมา
+                flowerModel.classList.add('show');
+                activateFireworkTrigger();
             }, 600);
         });
 
-        function showModel() {
-            if (!myModel) {
-                setTimeout(showModel, 100);
-                return;
-            }
-            let s = 0;
-            const grow = setInterval(() => {
-                s += 0.05;
-                myModel.scale.set(s * 4, s * 4, s * 4); // สามารถปรับเพิ่ม/ลดขนาดของดอกไม้ได้จากเลข 4 ตรงนี้ครับ
-                if (s >= 1) {
-                    clearInterval(grow);
-                    isModelReady = true;
-                    activateFireworkTrigger();
-                }
-            }, 20);
-        }
-
         /* ======================================================== */
-        /* [ระบบพลูพิกเซลหัวใจฉลองวันครบรอบ] */
+        /* [ระบบพลูพิกเซลหัวใจฉลองวันครบรอบเมื่อคลิกที่จอ] */
         /* ======================================================== */
         const canvas = document.getElementById('heart-rain-canvas');
         const ctx = canvas.getContext('2d');
@@ -262,7 +232,7 @@
 
         function activateFireworkTrigger() {
             document.getElementById('canvas-container').addEventListener('click', (e) => {
-                if (!isModelReady || hasClickedFirework) return;
+                if (hasClickedFirework) return;
                 hasClickedFirework = true; isNightMode = true;
                 document.body.style.backgroundColor = '#000000';
                 spawnGiganticFirework(e.clientX, e.clientY);
@@ -294,14 +264,6 @@
             requestAnimationFrame(loopPixelRain);
         }
         requestAnimationFrame(loopPixelRain);
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        // สั่งเปิดฉากทำงานทันที
-        init3D();
     </script>
 </body>
 
