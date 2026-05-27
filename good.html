@@ -19,8 +19,7 @@
             font-optical-sizing: auto;
             font-weight: 200;
             font-style: normal;
-            font-variation-settings:
-                "ROND" 0;
+            font-variation-settings: "ROND" 0;
         }
 
         body {
@@ -42,7 +41,11 @@
             width: 100%;
             height: 100%;
             z-index: 2;
-            /* ปรับให้อยู่เหนือพื้นหลัง แต่ต่ำกว่าซองจดหมาย */
+        }
+
+        /* ปิดกั้นการคลิกฟองอากาศชั่วคราวก่อนซองจดหมายจะเปิด */
+        .disable-click {
+            pointer-events: none;
         }
 
         #heart-rain-canvas {
@@ -52,20 +55,15 @@
             width: 100%;
             height: 100%;
             z-index: 1;
-            /* ปรับ z-index ให้อยู่ข้างหลังโมเดล 3D และซอง */
-            /* 👑 คีย์เวิร์ดสำคัญ: ยอมให้เมาส์ทะลุไปหาโมเดล 3D ด้านหลังได้เมื่อต้องการ */
             pointer-events: none;
         }
 
-        /* 🛠️ ปรับโครงสร้างซองจดหมายให้รองรับ Responsive หน้าจอไม่พัง */
+        /* ปรับโครงสร้างซองจดหมายให้รองรับ Responsive หน้าจอไม่พัง */
         .envelope-wrapper {
             position: relative;
             width: 450px;
-            /* กำหนดความกว้างสูงสุดตอนจอใหญ่ */
             max-width: 80%;
-            /* ถ้าจอเล็กกว่า 450px ให้หดเหลือ 80% ของหน้าจออัตโนมัติ */
             aspect-ratio: 4 / 3;
-            /* ล็อกอัตราส่วนกว้าง-สูงให้คงที่เสมอ จอเล็กแค่ไหนทรงก็ไม่เพี้ยน */
             z-index: 10;
             cursor: pointer;
             transition: transform 0.8s cubic-bezier(0.6, -0.28, 0.735, 0.045), opacity 0.5s;
@@ -107,7 +105,6 @@
         .open .envelope-flap {
             transform: rotateX(180deg);
             z-index: 5;
-            /* เมื่อเปิดแล้วดันหลบไปข้างหลัง จะได้ไม่บังดอกไม้ */
         }
 
         .envelope-wrapper.slide-down {
@@ -130,7 +127,7 @@
 
 <body>
 
-    <div id="canvas-container"></div>
+    <div id="canvas-container" class="disable-click"></div>
 
     <canvas id="heart-rain-canvas"></canvas>
 
@@ -144,6 +141,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script src="https://unpkg.com/meshoptimizer@0.18.1/meshopt_decoder.js"></script>
 
     <script>
         let scene, camera, renderer, myModel, controls;
@@ -160,7 +159,7 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            // 🖱️ ตัวควบคุมการหมุน/ลากโมเดล (กลับมาทำงานได้ตามปกติแล้ว)
+            // ตัวควบคุมการหมุน/ลากโมเดล
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
 
@@ -170,13 +169,20 @@
             scene.add(sun);
 
             const loader = new THREE.GLTFLoader();
-            loader.load('hydrangea1.glb', (gltf) => {
+            
+            // สั่งให้ GLTFLoader รู้จักและใช้ตัวถอดรหัส Meshopt
+            loader.setMeshoptDecoder(MeshoptDecoder);
+
+            // เรียกโหลดไฟล์ไฮเดรนเยียขนาดใหญ่
+            loader.load('hydrangea.glb', (gltf) => {
                 myModel = gltf.scene;
                 const box = new THREE.Box3().setFromObject(myModel);
                 const center = box.getCenter(new THREE.Vector3());
                 myModel.position.sub(center);
                 myModel.scale.set(0, 0, 0);
                 scene.add(myModel);
+            }, undefined, (error) => {
+                console.error("เกิดข้อผิดพลาดในการโหลดโมเดล: ", error);
             });
 
             animate();
@@ -188,7 +194,6 @@
             if (controls) controls.update();
 
             if (myModel) {
-                // หมุนเบาๆ เป็นธรรมชาติ แต่ถ้าผู้ใช้ลากเมาส์หมุนจะสู้มือได้
                 myModel.rotation.y += 0.005;
                 myModel.position.y = Math.sin(Date.now() * 0.002) * 0.05;
             }
@@ -200,31 +205,35 @@
 
         wrapper.addEventListener('click', () => {
             wrapper.classList.add('open');
-            hint.style.opacity = '0';
+            if(hint) hint.style.opacity = '0';
 
             setTimeout(() => {
                 wrapper.classList.add('slide-down');
+                document.getElementById('canvas-container').classList.remove('disable-click');
                 showModel();
             }, 600);
         });
 
         function showModel() {
-            if (!myModel) return;
+            if (!myModel) {
+                setTimeout(showModel, 100);
+                return;
+            }
             let s = 0;
             const grow = setInterval(() => {
                 s += 0.05;
 
+                // ขนาดคูณ 4 (ปรับตัวเลขตามต้องการได้)
                 myModel.scale.set(s * 4, s * 4, s * 4);
                 if (s >= 1) {
                     clearInterval(grow);
                     isModelReady = true;
-                    // 🌟 เมื่อโมเดลขึ้นมาพร้อมแล้ว ยอมรับการคลิกพลุบนหน้าจอได้
                     activateFireworkTrigger();
                 }
             }, 20);
         }
 
-        // ======================================================== */
+        /* ======================================================== */
         /* [โหมดบิ๊กเซอร์ไพรส์] พลูหัวใจพิกเซลยักษ์ 25x27 ไม่กระจายหลุดเฟรม */
         /* ======================================================== */
         const canvas = document.getElementById('heart-rain-canvas');
@@ -320,7 +329,6 @@
                 this.x = startX;
                 this.y = startY;
 
-                // 🛠️ [แก้ไขตามบรีฟ] ลดแรงส่งระเบิดลง เพื่อไม่ให้พลุกระจายดีดไปไกลเกิน
                 let forceMultiplier = Math.random() * 0.02 + 0.035;
                 this.vx = (targetX - startX) * forceMultiplier;
                 this.vy = (targetY - startY) * forceMultiplier;
@@ -337,7 +345,6 @@
                 this.y += this.vy;
                 this.vy += 0.008;
 
-                // 🛠️ [แก้ไขตามบรีฟ] เพิ่มแรงเบรก (หน่วงความเร็ว) ให้ล็อกทรงหัวใจอยู่กับที่สวยๆ ไม่ฟุ้งหลุดเฟรม
                 this.vx *= 0.935;
                 this.vy *= 0.935;
 
@@ -358,7 +365,6 @@
         }
 
         function spawnGiganticFirework(x, y) {
-            // ปรับระยะบล็อกให้แคบลงนิดหน่อยที่ 20 เพื่อให้เกาะกลุ่มรูปหัวใจชัดเจนขึ้น
             const bigSpacing = 20;
 
             for (let row = 0; row < fireworkMatrix.length; row++) {
@@ -375,24 +381,18 @@
             }
         }
 
-        // 👑 ย้ายตัวดักจับการคลิกมาผูกที่กล่อง container แทน เพื่อไม่ให้ทับกับเมาส์ลาก 3D
         function activateFireworkTrigger() {
             const clickTarget = document.getElementById('canvas-container');
 
             clickTarget.addEventListener('click', (e) => {
-                // ถ้ากดโดนซองจดหมายเดิม (ที่กำลังเลื่อนลง) ไม่ต้องทำอะไร
                 if (!isModelReady || hasClickedFirework) return;
 
                 hasClickedFirework = true;
                 isNightMode = true;
 
-                // ดับไฟพึ่บ!
                 document.body.style.backgroundColor = '#000000';
-
-                // จุดพลุหัวใจยักษ์ตรงจุดที่เมาส์คลิกแบบพอดีเป๊ะ!
                 spawnGiganticFirework(e.clientX, e.clientY);
 
-                // เพิ่มข้อความ
                 let text = document.createElement('h1');
                 text.innerText = "Happy Anniversary";
                 text.style.position = 'absolute';
@@ -400,13 +400,14 @@
                 text.style.left = '50%';
                 text.style.transform = 'translate(-50%, -50%)';
                 text.style.color = '#ff4d6d';
-                text.style.fontFamily = 'doto, monospace';
+                text.style.fontFamily = "'Doto', monospace";
                 text.style.zIndex = '100';
                 document.body.appendChild(text);
 
-                // ลบข้อความออกหลังจาก 3 วินาที
                 setTimeout(() => {
-                    document.body.removeChild(text);
+                    if(text.parentNode) {
+                        document.body.removeChild(text);
+                    }
                 }, 3000);
             });
         }
@@ -414,7 +415,6 @@
         function loopPixelRain() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // อัปเดตและวาดพลูซูเปอร์ยักษ์
             for (let i = fireworksParticles.length - 1; i >= 0; i--) {
                 fireworksParticles[i].update();
                 fireworksParticles[i].draw();
@@ -423,14 +423,12 @@
                 }
             }
 
-            // สลับกลับสู่โหมดสว่างเมื่อพลุจางหายไปหมดแล้ว
             if (isNightMode && fireworksParticles.length === 0) {
                 isNightMode = false;
                 document.body.style.backgroundColor = '#000000';
                 isRainActive = true;
             }
 
-            // จัดการระบบฝนหัวใจ
             if (isRainActive) {
                 if (Math.random() < 0.18) {
                     pixelHearts.push(new PixelHeartGroup());
@@ -450,7 +448,6 @@
         }
 
         requestAnimationFrame(loopPixelRain);
-        // ======================================================== */
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
