@@ -19,8 +19,7 @@
             font-optical-sizing: auto;
             font-weight: 200;
             font-style: normal;
-            font-variation-settings:
-                "ROND" 0;
+            font-variation-settings: "ROND" 0;
         }
 
         body {
@@ -42,7 +41,12 @@
             width: 100%;
             height: 100%;
             z-index: 2;
-            /* ปรับให้อยู่เหนือพื้นหลัง แต่ต่ำกว่าซองจดหมาย */
+            /* ปรับให้อยู่เหนือพื้นหลัง แต่ต่ำกว่าซองจดหมายในตอนแรก */
+        }
+
+        /* 👑 เพิ่ม class เพื่อปิดกั้นการคลิกฟองอากาศชั่วคราวก่อนซองจดหมายจะเปิด */
+        .disable-click {
+            pointer-events: none;
         }
 
         #heart-rain-canvas {
@@ -53,7 +57,6 @@
             height: 100%;
             z-index: 1;
             /* ปรับ z-index ให้อยู่ข้างหลังโมเดล 3D และซอง */
-            /* 👑 คีย์เวิร์ดสำคัญ: ยอมให้เมาส์ทะลุไปหาโมเดล 3D ด้านหลังได้เมื่อต้องการ */
             pointer-events: none;
         }
 
@@ -61,7 +64,7 @@
         .envelope-wrapper {
             position: relative;
             width: 450px;
-            /* กำหนดความกว้างสูงสุดตอนจอใหญ่ */
+            /* 定กำหนดความกว้างสูงสุดตอนจอใหญ่ */
             max-width: 80%;
             /* ถ้าจอเล็กกว่า 450px ให้หดเหลือ 80% ของหน้าจออัตโนมัติ */
             aspect-ratio: 4 / 3;
@@ -130,7 +133,7 @@
 
 <body>
 
-    <div id="canvas-container"></div>
+    <div id="canvas-container" class="disable-click"></div>
 
     <canvas id="heart-rain-canvas"></canvas>
 
@@ -144,6 +147,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
     <script src="https://unpkg.com/meshoptimizer@0.18.1/meshopt_decoder.js"></script>
 
     <script>
@@ -161,7 +165,7 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            // 🖱️ ตัวควบคุมการหมุน/ลากโมเดล (กลับมาทำงานได้ตามปกติแล้ว)
+            // ตัวควบคุมการหมุน/ลากโมเดล
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
 
@@ -171,9 +175,11 @@
             scene.add(sun);
 
             const loader = new THREE.GLTFLoader();
-
-            loader.setMeshoptDecoder(MeshoptDecoder);
             
+            // 🛠️ สั่งให้ GLTFLoader รู้จักและใช้ตัวถอดรหัส Meshopt เพื่อแก้ปัญหาไฟล์เปิดไม่ได้
+            loader.setMeshoptDecoder(MeshoptDecoder);
+
+            // 🛠️ เปลี่ยนชื่อไฟล์จาก 'Orchid.glb' เป็น 'hydrangea.glb' ตามโครงสร้างโฟลเดอร์ของคุณ
             loader.load('hydrangea1.glb', (gltf) => {
                 myModel = gltf.scene;
                 const box = new THREE.Box3().setFromObject(myModel);
@@ -181,10 +187,9 @@
                 myModel.position.sub(center);
                 myModel.scale.set(0, 0, 0);
                 scene.add(myModel);
-            }, undefined, function (error) {
-    console.error(error);
-});
-                       );
+            }, undefined, (error) => {
+                console.error("เกิดข้อผิดพลาดในการโหลดโมเดล: ", error);
+            });
 
             animate();
         }
@@ -207,20 +212,27 @@
 
         wrapper.addEventListener('click', () => {
             wrapper.classList.add('open');
-            hint.style.opacity = '0';
+            if(hint) hint.style.opacity = '0';
 
             setTimeout(() => {
                 wrapper.classList.add('slide-down');
+                // เมื่อซองจดหมายเลื่อนหายไปแล้ว ให้ปลดล็อกหน้าจอ 3D เพื่อให้คลิกเล่นและหมุนโมเดลได้
+                document.getElementById('canvas-container').classList.remove('disable-click');
                 showModel();
             }, 600);
         });
 
         function showModel() {
-            if (!myModel) return;
+            if (!myModel) {
+                // เผื่อเน็ตช้าแล้วโมเดลยังโหลดไม่เสร็จ ให้รอแป๊บนึงแล้วเช็กใหม่
+                setTimeout(showModel, 100);
+                return;
+            }
             let s = 0;
             const grow = setInterval(() => {
                 s += 0.05;
 
+                // 🛠️ ปรับสเกลเริ่มต้นให้เหมาะสมกับไฮเดรนเยีย (ถ้าโมเดลเล็กหรือใหญ่ไป ปรับเลข 4 ตรงนี้ได้ครับ)
                 myModel.scale.set(s * 4, s * 4, s * 4);
                 if (s >= 1) {
                     clearInterval(grow);
@@ -231,7 +243,7 @@
             }, 20);
         }
 
-        // ======================================================== */
+        /* ======================================================== */
         /* [โหมดบิ๊กเซอร์ไพรส์] พลูหัวใจพิกเซลยักษ์ 25x27 ไม่กระจายหลุดเฟรม */
         /* ======================================================== */
         const canvas = document.getElementById('heart-rain-canvas');
@@ -327,7 +339,7 @@
                 this.x = startX;
                 this.y = startY;
 
-                // 🛠️ [แก้ไขตามบรีฟ] ลดแรงส่งระเบิดลง เพื่อไม่ให้พลุกระจายดีดไปไกลเกิน
+                // ลดแรงส่งระเบิดลง เพื่อไม่ให้พลุกระจายดีดไปไกลเกิน
                 let forceMultiplier = Math.random() * 0.02 + 0.035;
                 this.vx = (targetX - startX) * forceMultiplier;
                 this.vy = (targetY - startY) * forceMultiplier;
@@ -344,7 +356,7 @@
                 this.y += this.vy;
                 this.vy += 0.008;
 
-                // 🛠️ [แก้ไขตามบรีฟ] เพิ่มแรงเบรก (หน่วงความเร็ว) ให้ล็อกทรงหัวใจอยู่กับที่สวยๆ ไม่ฟุ้งหลุดเฟรม
+                // เพิ่มแรงเบรก (หน่วงความเร็ว) ให้ล็อกทรงหัวใจอยู่กับที่สวยๆ ไม่ฟุ้งหลุดเฟรม
                 this.vx *= 0.935;
                 this.vy *= 0.935;
 
@@ -365,7 +377,6 @@
         }
 
         function spawnGiganticFirework(x, y) {
-            // ปรับระยะบล็อกให้แคบลงนิดหน่อยที่ 20 เพื่อให้เกาะกลุ่มรูปหัวใจชัดเจนขึ้น
             const bigSpacing = 20;
 
             for (let row = 0; row < fireworkMatrix.length; row++) {
@@ -382,24 +393,24 @@
             }
         }
 
-        // 👑 ย้ายตัวดักจับการคลิกมาผูกที่กล่อง container แทน เพื่อไม่ให้ทับกับเมาส์ลาก 3D
+        // ย้ายตัวดักจับการคลิกมาผูกที่กล่อง container แทน เพื่อไม่ให้ทับกับเมาส์ลาก 3D
         function activateFireworkTrigger() {
             const clickTarget = document.getElementById('canvas-container');
 
             clickTarget.addEventListener('click', (e) => {
-                // ถ้ากดโดนซองจดหมายเดิม (ที่กำลังเลื่อนลง) ไม่ต้องทำอะไร
+                // ถ้าโมเดลยังไม่พร้อม หรือคลิกไปแล้วรอบนึง ไม่ต้องทำอะไรซ้ำ
                 if (!isModelReady || hasClickedFirework) return;
 
                 hasClickedFirework = true;
                 isNightMode = true;
 
-                // ดับไฟพึ่บ!
+                // ดับไฟพึ่บ! เปลี่ยนพื้นหลังเป็นสีดำ
                 document.body.style.backgroundColor = '#000000';
 
                 // จุดพลุหัวใจยักษ์ตรงจุดที่เมาส์คลิกแบบพอดีเป๊ะ!
                 spawnGiganticFirework(e.clientX, e.clientY);
 
-                // เพิ่มข้อความ
+                // เพิ่มข้อความเฉลิมฉลอง
                 let text = document.createElement('h1');
                 text.innerText = "Happy Anniversary";
                 text.style.position = 'absolute';
@@ -407,13 +418,15 @@
                 text.style.left = '50%';
                 text.style.transform = 'translate(-50%, -50%)';
                 text.style.color = '#ff4d6d';
-                text.style.fontFamily = 'doto, monospace';
+                text.style.fontFamily = "'Doto', monospace";
                 text.style.zIndex = '100';
                 document.body.appendChild(text);
 
                 // ลบข้อความออกหลังจาก 3 วินาที
                 setTimeout(() => {
-                    document.body.removeChild(text);
+                    if(text.parentNode) {
+                        document.body.removeChild(text);
+                    }
                 }, 3000);
             });
         }
@@ -457,7 +470,6 @@
         }
 
         requestAnimationFrame(loopPixelRain);
-        // ======================================================== */
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
