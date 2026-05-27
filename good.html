@@ -171,6 +171,9 @@
             scene.add(sun);
 
             const loader = new THREE.GLTFLoader();
+
+            loader.setMeshoptDecoder(MeshoptDecoder);
+            
             loader.load('hydrangea1.glb', (gltf) => {
                 myModel = gltf.scene;
                 const box = new THREE.Box3().setFromObject(myModel);
@@ -178,7 +181,10 @@
                 myModel.position.sub(center);
                 myModel.scale.set(0, 0, 0);
                 scene.add(myModel);
-            });
+            }, undefined, function (error) {
+    console.error(error);
+});
+                       );
 
             animate();
         }
