@@ -90,20 +90,11 @@
         <div class="envelope-front"></div>
     </div>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
+    <script>
         let scene, camera, renderer, myModel, controls;
         let isModelReady = false;
         let hasClickedFirework = false;
@@ -116,12 +107,12 @@
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // ใช้มาตรฐานแสงสีระบบใหม่ที่รองรับไฟล์บีบอัดได้อย่างถูกต้อง
-            renderer.colorSpace = THREE.SRGBColorSpace; 
+            // ตั้งค่าสีมาตรฐานยุคใหม่ให้แสดงผลดอกไม้ได้ถูกต้อง
+            renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            controls = new OrbitControls(camera, renderer.domElement);
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
 
             scene.add(new THREE.AmbientLight(0xffffff, 1.2));
@@ -129,8 +120,8 @@
             sun.position.set(5, 5, 5);
             scene.add(sun);
 
-            // โหลดโมเดล hydrangea1.glb ตรงๆ ได้ทันที
-            const loader = new GLTFLoader();
+            // สั่งโหลดไฟล์ hydrangea1.glb ของคุณตรงๆ ได้เลย
+            const loader = new THREE.GLTFLoader();
             loader.load('hydrangea1.glb', (gltf) => {
                 myModel = gltf.scene;
                 const box = new THREE.Box3().setFromObject(myModel);
@@ -139,7 +130,7 @@
                 myModel.scale.set(0, 0, 0);
                 scene.add(myModel);
             }, undefined, (error) => {
-                console.error("เกิดข้อผิดพลาด: ", error);
+                console.error("เกิดข้อผิดพลาดในการเปิดโมเดล: ", error);
             });
 
             animate();
@@ -173,7 +164,7 @@
             let s = 0;
             const grow = setInterval(() => {
                 s += 0.05;
-                myModel.scale.set(s * 4, s * 4, s * 4); // ปรับขนาดโมเดลตรงนี้ได้ครับ
+                myModel.scale.set(s * 4, s * 4, s * 4); // สามารถปรับเพิ่ม/ลดขนาดของดอกไม้ได้จากเลข 4 ตรงนี้ครับ
                 if (s >= 1) {
                     clearInterval(grow);
                     isModelReady = true;
@@ -309,6 +300,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        // สั่งเปิดฉากทำงานทันที
         init3D();
     </script>
 </body>
