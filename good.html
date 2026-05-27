@@ -171,7 +171,7 @@
             loader.setDRACOLoader(dracoLoader);
 
             // 📝 ตรงนี้ใส่ชื่อไฟล์ที่บีบอัดแล้วของคุณ (สมมติว่าเป็นไฟล์ flower_bouquet.glb ขนาด 39MB)
-            loader.load('flower_bouquet.glb', (gltf) => {
+            loader.load('hydrangea.glb', (gltf) => {
                 myModel = gltf.scene;
                 const box = new THREE.Box3().setFromObject(myModel);
                 const center = box.getCenter(new THREE.Vector3());
