@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* เริ่มต้นที่สีฟ้าปกติ */
             --bg: #e4fffe;
         }
 
@@ -26,7 +25,6 @@
             margin: 0;
             padding: 0;
             background-color: var(--bg);
-            /* ใส่ transition เพื่อให้จังหวะสว่างกลับมาดูนุ่มนวล */
             transition: background-color 0.8s ease;
             overflow: hidden;
             display: flex;
@@ -43,7 +41,6 @@
             z-index: 2;
         }
 
-        /* ปิดกั้นการคลิกฟองอากาศชั่วคราวก่อนซองจดหมายจะเปิด */
         .disable-click {
             pointer-events: none;
         }
@@ -58,7 +55,6 @@
             pointer-events: none;
         }
 
-        /* ปรับโครงสร้างซองจดหมายให้รองรับ Responsive หน้าจอไม่พัง */
         .envelope-wrapper {
             position: relative;
             width: 450px;
@@ -70,7 +66,6 @@
             perspective: 1000px;
         }
 
-        /* บังคับภาพขยายเต็มพื้นที่กล่องแม่แบบ 100% ป้องกันฝาซองห่างเยื้อง */
         .envelope-back,
         .envelope-flap,
         .envelope-front {
@@ -142,22 +137,12 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/meshoptimizer/0.16.0/meshopt_decoder.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 
     <script>
         let scene, camera, renderer, myModel, controls;
         let isModelReady = false;
         let hasClickedFirework = false;
-
-        // สั่งให้รอโหลดไลบรารีถอดรหัสให้พร้อมในหน่วยความจำก่อนรันระบบ 3D
-        window.addEventListener('DOMContentLoaded', () => {
-            // รอให้คลาส MeshoptDecoder พร้อมใช้งาน แล้วจึงเริ่มต้นโมดูล
-            if (typeof MeshoptDecoder !== 'undefined' && MeshoptDecoder.ready) {
-                MeshoptDecoder.ready.then(init3D);
-            } else {
-                init3D();
-            }
-        });
 
         function init3D() {
             scene = new THREE.Scene();
@@ -169,7 +154,6 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            // ตัวควบคุมการหมุน/ลากโมเดล
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
 
@@ -178,15 +162,16 @@
             sun.position.set(5, 5, 5);
             scene.add(sun);
 
-            const loader = new THREE.GLTFLoader();
-            
-            // ส่งค่าคำสั่งถอดรหัสตัวคีย์เวิร์ดหลักของ Meshopt เข้าสู่ระบบโหลดไฟล์
-            if (typeof MeshoptDecoder !== 'undefined') {
-                loader.setMeshoptDecoder(MeshoptDecoder);
-            }
+            // เซ็ตตั้งค่าตัวถอดรหัสขยายไฟล์แบบ Draco 
+            const dracoLoader = new THREE.DRACOLoader();
+            // ดึงโมดูลช่วยถอดรหัสจากเซิร์ฟเวอร์กลางของ Three.js เพื่อให้ถอดรหัสไฟล์ .glb ที่ถูกบีบอัดได้สมบูรณ์
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
 
-            // เรียกโหลดไฟล์ไฮเดรนเยีย 123MB ของคุณ
-            loader.load('hydrangea.glb', (gltf) => {
+            const loader = new THREE.GLTFLoader();
+            loader.setDRACOLoader(dracoLoader);
+
+            // 📝 ตรงนี้ใส่ชื่อไฟล์ที่บีบอัดแล้วของคุณ (สมมติว่าเป็นไฟล์ flower_bouquet.glb ขนาด 39MB)
+            loader.load('flower_bouquet.glb', (gltf) => {
                 myModel = gltf.scene;
                 const box = new THREE.Box3().setFromObject(myModel);
                 const center = box.getCenter(new THREE.Vector3());
@@ -202,9 +187,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-
             if (controls) controls.update();
-
             if (myModel) {
                 myModel.rotation.y += 0.005;
                 myModel.position.y = Math.sin(Date.now() * 0.002) * 0.05;
@@ -234,8 +217,6 @@
             let s = 0;
             const grow = setInterval(() => {
                 s += 0.05;
-
-                // ขนาดคูณ 4 (ปรับตัวเลขตามขนาดโมเดลที่ต้องการได้)
                 myModel.scale.set(s * 4, s * 4, s * 4);
                 if (s >= 1) {
                     clearInterval(grow);
@@ -340,11 +321,9 @@
             constructor(startX, startY, targetX, targetY) {
                 this.x = startX;
                 this.y = startY;
-
                 let forceMultiplier = Math.random() * 0.02 + 0.035;
                 this.vx = (targetX - startX) * forceMultiplier;
                 this.vy = (targetY - startY) * forceMultiplier;
-
                 this.pixelSize = 5.5;
                 this.glow = 55;
                 this.opacity = 1;
@@ -356,10 +335,8 @@
                 this.x += this.vx;
                 this.y += this.vy;
                 this.vy += 0.008;
-
                 this.vx *= 0.935;
                 this.vy *= 0.935;
-
                 this.life -= this.decay;
                 this.opacity = this.life;
                 if (this.glow > 0) this.glow -= 0.08;
@@ -378,13 +355,11 @@
 
         function spawnGiganticFirework(x, y) {
             const bigSpacing = 20;
-
             for (let row = 0; row < fireworkMatrix.length; row++) {
                 for (let col = 0; col < fireworkMatrix[row].length; col++) {
                     if (fireworkMatrix[row][col] === 1) {
                         let offsetX = (col - 13) * bigSpacing;
                         let offsetY = (row - 10) * bigSpacing;
-
                         fireworksParticles.push(
                             new FireworkParticle(x, y, x + offsetX, y + offsetY)
                         );
@@ -395,13 +370,11 @@
 
         function activateFireworkTrigger() {
             const clickTarget = document.getElementById('canvas-container');
-
             clickTarget.addEventListener('click', (e) => {
                 if (!isModelReady || hasClickedFirework) return;
 
                 hasClickedFirework = true;
                 isNightMode = true;
-
                 document.body.style.backgroundColor = '#000000';
                 spawnGiganticFirework(e.clientX, e.clientY);
 
@@ -426,7 +399,6 @@
 
         function loopPixelRain() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             for (let i = fireworksParticles.length - 1; i >= 0; i--) {
                 fireworksParticles[i].update();
                 fireworksParticles[i].draw();
@@ -434,28 +406,23 @@
                     fireworksParticles.splice(i, 1);
                 }
             }
-
             if (isNightMode && fireworksParticles.length === 0) {
                 isNightMode = false;
                 document.body.style.backgroundColor = '#000000';
                 isRainActive = true;
             }
-
             if (isRainActive) {
                 if (Math.random() < 0.18) {
                     pixelHearts.push(new PixelHeartGroup());
                 }
-
                 for (let i = pixelHearts.length - 1; i >= 0; i--) {
                     pixelHearts[i].update();
                     pixelHearts[i].draw();
-
                     if (pixelHearts[i].opacity <= 0 || pixelHearts[i].y > canvas.height + 40) {
                         pixelHearts.splice(i, 1);
                     }
                 }
             }
-
             requestAnimationFrame(loopPixelRain);
         }
 
@@ -466,6 +433,9 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // รันระบบ 3D ทันที
+        init3D();
     </script>
 </body>
 
