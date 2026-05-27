@@ -8,18 +8,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Doto:wght@100..900&display=swap" rel="stylesheet">
+    
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+
     <style>
         :root {
             --bg: #e4fffe;
-        }
-
-        .doto-body {
-            font-family: "Doto", sans-serif;
-            font-optical-sizing: auto;
-            font-weight: 200;
-            font-style: normal;
-            font-variation-settings:
-                "ROND" 0;
         }
 
         body {
@@ -40,6 +34,29 @@
             width: 100%;
             height: 100%;
             z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ตั้งค่ากล่องโมเดล 3D ให้ใหญ่เต็มจอและโปร่งใส */
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            opacity: 0;
+            transform: scale(0);
+            transition: opacity 1s ease, transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* คลาสสั่งให้โมเดลค่อยๆ ขยายใหญ่ตอนเปิดซองจดหมาย */
+        model-viewer.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .disable-click {
+            pointer-events: none;
         }
 
         #heart-rain-canvas {
@@ -54,62 +71,49 @@
 
         .envelope-wrapper {
             position: relative;
-            width: 300px;
-            height: 225px;
+            width: 450px;
+            max-width: 80%;
+            aspect-ratio: 4 / 3;
             z-index: 10;
             cursor: pointer;
             transition: transform 0.8s cubic-bezier(0.6, -0.28, 0.735, 0.045), opacity 0.5s;
+            perspective: 1000px;
         }
 
-        .envelope-back {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-image: url('envelope-back.png');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            z-index: 1;
-        }
-
-        .envelope-flap {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-image: url('envelope-flap.png');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            z-index: 3;
-            transform-origin: top center;
-            transition: transform 0.6s ease-in-out;
-        }
-
+        .envelope-back,
+        .envelope-flap,
         .envelope-front {
             position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            background-image: url('envelope-front.png');
-            background-size: contain;
-            background-repeat: no-repeat;
             background-position: center;
-            z-index: 2;
+            background-repeat: no-repeat;
+            background-size: 100% 100%;
         }
 
-        .open .envelope-flap {
-            transform: rotateX(180deg);
-        }
-
-        .envelope-wrapper.slide-down {
-            transform: translateY(100vh);
-            opacity: 0;
-        }
+        .envelope-back { background-image: url('envelope-back.png'); z-index: 1; }
+        .envelope-flap { height: 80%; background-image: url('envelope-flap.png'); z-index: 5; transform-origin: top center; transition: transform 0.6s ease-in-out; }
+        .envelope-front { background-image: url('envelope-front.png'); z-index: 4; }
+        .open .envelope-flap { transform: rotateX(180deg); z-index: 5; }
+        .envelope-wrapper.slide-down { transform: translateY(120vh); opacity: 0; pointer-events: none; }
     </style>
 </head>
 
 <body>
 
-    <div id="canvas-container"></div>
+    <div id="canvas-container" class="disable-click">
+        <model-viewer 
+            id="flower-model"
+            src="hydrangea1.glb" 
+            alt="Hydrangea Flowers"
+            auto-rotate
+            camera-controls
+            interaction-prompt="none"
+            shadow-intensity="1">
+        </model-viewer>
+    </div>
 
     <canvas id="heart-rain-canvas"></canvas>
 
@@ -119,124 +123,147 @@
         <div class="envelope-front"></div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-
     <script>
-        let scene, camera, renderer, myModel, controls;
-
-        function init3D() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 5;
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-
-            scene.add(new THREE.AmbientLight(0xffffff, 1));
-            const sun = new THREE.DirectionalLight(0xffffff, 1);
-            sun.position.set(5, 5, 5);
-            scene.add(sun);
-
-            const loader = new THREE.GLTFLoader();
-            loader.load('https://modelviewer.dev/shared-assets/models/Astronaut.glb', (gltf) => {
-                myModel = gltf.scene;
-                myModel.scale.set(0, 0, 0);
-                scene.add(myModel);
-            });
-
-            animate();
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if (myModel) {
-                myModel.rotation.y += 0.01;
-            }
-            renderer.render(scene, camera);
-        }
+        let isModelReady = true; // ระบบใหม่พร้อมทำงานทันที
+        let hasClickedFirework = false;
 
         const wrapper = document.getElementById('envelope-trigger');
+        const flowerModel = document.getElementById('flower-model');
+
+        // คลิกเปิดซองจดหมาย
         wrapper.addEventListener('click', () => {
             wrapper.classList.add('open');
             setTimeout(() => {
                 wrapper.classList.add('slide-down');
-                showModel();
+                document.getElementById('canvas-container').classList.remove('disable-click');
+                
+                // สั่งให้โมเดลขยายตัวเด้งขึ้นมา
+                flowerModel.classList.add('show');
+                activateFireworkTrigger();
             }, 600);
         });
 
-        function showModel() {
-            if (!myModel) return;
-            let s = 0;
-            const grow = setInterval(() => {
-                s += 0.05;
-                myModel.scale.set(s, s, s);
-                if (s >= 1) {
-                    clearInterval(grow);
-                }
-            }, 20);
-        }
-
+        /* ======================================================== */
+        /* [ระบบพลูพิกเซลหัวใจฉลองวันครบรอบเมื่อคลิกที่จอ] */
+        /* ======================================================== */
         const canvas = document.getElementById('heart-rain-canvas');
         const ctx = canvas.getContext('2d');
-        const hearts = [];
-        const heartCount = 300;
-        const matrix = [[0, 1, 1, 0, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1], [0, 1, 1, 1, 1, 1, 0], [0, 0, 1, 1, 1, 0, 0], [0, 0, 0, 1, 0, 0, 0]];
+        let pixelHearts = [];
+        let fireworksParticles = [];
+        let isRainActive = false;
+        let isNightMode = false;
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
+        const rainMatrix = [[0,1,1,0,1,1,0],[1,1,1,1,1,1,1],[1,1,1,1,1,1,1],[0,1,1,1,1,1,0],[0,0,1,1,1,0,0],[0,0,0,1,0,0,0]];
+        const fireworkMatrix = [
+            [0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0],
+            [0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0],
+            [0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0],
+            [1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+            [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+            [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+            [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+            [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        ];
 
-        class PixelHeart {
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+        class PixelHeartGroup {
             constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = 2;
-                this.opacity = 1;
-                this.speedX = (Math.random() - 0.5) * 1;
-                this.speedY = Math.random() * 2;
-            }
-            draw() {
-                ctx.save();
-                ctx.globalAlpha = this.opacity;
-                ctx.fillStyle = '#ff4d6d';
-                matrix.forEach((row, rowIndex) => {
-                    row.forEach((col, colIndex) => {
-                        if (col === 1) ctx.fillRect(this.x + colIndex * this.size, this.y + rowIndex * this.size, this.size, this.size);
-                    });
-                });
-                ctx.restore();
+                this.x = Math.random() * (canvas.width - 30); this.y = -30;
+                this.speed = Math.random() * 0.6 + 0.8; this.pixelSize = 2; this.spacing = this.pixelSize + 1.5;
+                this.glow = 18; this.opacity = 1;
             }
             update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                if (this.y > canvas.height) {
-                    this.y = -matrix.length * this.size;
-                    this.speedY = Math.random() * 2;
+                this.y += this.speed;
+                if (this.y > canvas.height * 0.6 && this.glow > 0) this.glow -= 0.04;
+                if (this.y > canvas.height * 0.85) this.opacity -= 0.015;
+            }
+            draw() {
+                ctx.save(); ctx.globalAlpha = Math.max(0, this.opacity); ctx.shadowBlur = this.glow;
+                ctx.shadowColor = '#ff4d6d'; ctx.fillStyle = '#ffffff';
+                for (let r = 0; r < rainMatrix.length; r++) {
+                    for (let c = 0; c < rainMatrix[r].length; c++) {
+                        if (rainMatrix[r][c] === 1) ctx.fillRect(this.x + (c * this.spacing), this.y + (r * this.spacing), this.pixelSize, this.pixelSize);
+                    }
+                }
+                ctx.restore();
+            }
+        }
+
+        class FireworkParticle {
+            constructor(startX, startY, targetX, targetY) {
+                this.x = startX; this.y = startY;
+                let force = Math.random() * 0.02 + 0.035;
+                this.vx = (targetX - startX) * force; this.vy = (targetY - startY) * force;
+                this.pixelSize = 5.5; this.glow = 55; this.opacity = 1; this.life = 1.0; this.decay = Math.random() * 0.005 + 0.005;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy; this.vy += 0.008; this.vx *= 0.935; this.vy *= 0.935;
+                this.life -= this.decay; this.opacity = this.life; if (this.glow > 0) this.glow -= 0.08;
+            }
+            draw() {
+                ctx.save(); ctx.globalAlpha = Math.max(0, this.opacity); ctx.shadowBlur = this.glow;
+                ctx.shadowColor = '#ff4d6d'; ctx.fillStyle = '#ffffff'; ctx.fillRect(this.x, this.y, this.pixelSize, this.pixelSize); ctx.restore();
+            }
+        }
+
+        function spawnGiganticFirework(x, y) {
+            const spacing = 20;
+            for (let r = 0; r < fireworkMatrix.length; r++) {
+                for (let c = 0; c < fireworkMatrix[r].length; c++) {
+                    if (fireworkMatrix[r][c] === 1) fireworksParticles.push(new FireworkParticle(x, y, x + (c - 13) * spacing, y + (r - 10) * spacing));
                 }
             }
         }
 
-        for (let i = 0; i < heartCount; i++) hearts.push(new PixelHeart());
+        function activateFireworkTrigger() {
+            document.getElementById('canvas-container').addEventListener('click', (e) => {
+                if (hasClickedFirework) return;
+                hasClickedFirework = true; isNightMode = true;
+                document.body.style.backgroundColor = '#000000';
+                spawnGiganticFirework(e.clientX, e.clientY);
 
-        function loop() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            hearts.forEach((heart) => {
-                heart.draw();
-                heart.update();
+                let text = document.createElement('h1');
+                text.innerText = "Happy Anniversary";
+                text.style.position = 'absolute'; text.style.top = '50%'; text.style.left = '50%';
+                text.style.transform = 'translate(-50%, -50%)'; text.style.color = '#ff4d6d';
+                text.style.fontFamily = "'Doto', monospace"; text.style.zIndex = '100';
+                document.body.appendChild(text);
+                setTimeout(() => { if(text.parentNode) document.body.removeChild(text); }, 3000);
             });
-            requestAnimationFrame(loop);
         }
 
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-        init3D();
-        loop();
+        function loopPixelRain() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = fireworksParticles.length - 1; i >= 0; i--) {
+                fireworksParticles[i].update(); fireworksParticles[i].draw();
+                if (fireworksParticles[i].life <= 0) fireworksParticles.splice(i, 1);
+            }
+            if (isNightMode && fireworksParticles.length === 0) { isNightMode = false; isRainActive = true; }
+            if (isRainActive) {
+                if (Math.random() < 0.18) pixelHearts.push(new PixelHeartGroup());
+                for (let i = pixelHearts.length - 1; i >= 0; i--) {
+                    pixelHearts[i].update(); pixelHearts[i].draw();
+                    if (pixelHearts[i].opacity <= 0 || pixelHearts[i].y > canvas.height + 40) pixelHearts.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(loopPixelRain);
+        }
+        requestAnimationFrame(loopPixelRain);
     </script>
 </body>
 
