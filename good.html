@@ -13,14 +13,6 @@
             --bg: #e4fffe;
         }
 
-        .doto-body {
-            font-family: "Doto", sans-serif;
-            font-optical-sizing: auto;
-            font-weight: 200;
-            font-style: normal;
-            font-variation-settings: "ROND" 0;
-        }
-
         body {
             margin: 0;
             padding: 0;
@@ -79,70 +71,44 @@
             background-size: 100% 100%;
         }
 
-        .envelope-back {
-            background-image: url('envelope-back.png');
-            z-index: 1;
-        }
-
-        .envelope-flap {
-            height: 80%;
-            background-image: url('envelope-flap.png');
-            z-index: 5;
-            transform-origin: top center;
-            transition: transform 0.6s ease-in-out;
-        }
-
-        .envelope-front {
-            background-image: url('envelope-front.png');
-            z-index: 4;
-        }
-
-        .open .envelope-flap {
-            transform: rotateX(180deg);
-            z-index: 5;
-        }
-
-        .envelope-wrapper.slide-down {
-            transform: translateY(120vh);
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .hint {
-            position: absolute;
-            bottom: -50px;
-            width: 100%;
-            text-align: center;
-            color: #ff4d6d;
-            font-weight: bold;
-            transition: opacity 0.3s;
-        }
+        .envelope-back { background-image: url('envelope-back.png'); z-index: 1; }
+        .envelope-flap { height: 80%; background-image: url('envelope-flap.png'); z-index: 5; transform-origin: top center; transition: transform 0.6s ease-in-out; }
+        .envelope-front { background-image: url('envelope-front.png'); z-index: 4; }
+        .open .envelope-flap { transform: rotateX(180deg); z-index: 5; }
+        .envelope-wrapper.slide-down { transform: translateY(120vh); opacity: 0; pointer-events: none; }
     </style>
 </head>
 
 <body>
 
     <div id="canvas-container" class="disable-click"></div>
-
     <canvas id="heart-rain-canvas"></canvas>
 
     <div class="envelope-wrapper" id="envelope-trigger">
         <div class="envelope-back"></div>
         <div class="envelope-flap"></div>
         <div class="envelope-front"></div>
-        <div class="hint" id="hint-text"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+    <script src="https://unpkg.com/meshoptimizer@0.16.0/meshopt_decoder.js"></script>
 
     <script>
         let scene, camera, renderer, myModel, controls;
         let isModelReady = false;
         let hasClickedFirework = false;
+
+        // รอให้ Meshopt โหลดเสร็จเรียบร้อยก่อนเปิดระบบ
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof MeshoptDecoder !== 'undefined' && MeshoptDecoder.ready) {
+                MeshoptDecoder.ready.then(init3D);
+            } else {
+                init3D();
+            }
+        });
 
         function init3D() {
             scene = new THREE.Scene();
@@ -162,25 +128,39 @@
             sun.position.set(5, 5, 5);
             scene.add(sun);
 
-            // เซ็ตตั้งค่าตัวถอดรหัสขยายไฟล์แบบ Draco 
-            const dracoLoader = new THREE.DRACOLoader();
-            // ดึงโมดูลช่วยถอดรหัสจากเซิร์ฟเวอร์กลางของ Three.js เพื่อให้ถอดรหัสไฟล์ .glb ที่ถูกบีบอัดได้สมบูรณ์
-            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-
             const loader = new THREE.GLTFLoader();
-            loader.setDRACOLoader(dracoLoader);
+            if (typeof MeshoptDecoder !== 'undefined') {
+                loader.setMeshoptDecoder(MeshoptDecoder);
+            }
 
-            // 📝 ตรงนี้ใส่ชื่อไฟล์ที่บีบอัดแล้วของคุณ (สมมติว่าเป็นไฟล์ flower_bouquet.glb ขนาด 39MB)
-            loader.load('hydrangea.glb', (gltf) => {
-                myModel = gltf.scene;
-                const box = new THREE.Box3().setFromObject(myModel);
-                const center = box.getCenter(new THREE.Vector3());
-                myModel.position.sub(center);
-                myModel.scale.set(0, 0, 0);
-                scene.add(myModel);
-            }, undefined, (error) => {
-                console.error("เกิดข้อผิดพลาดในการโหลดโมเดล: ", error);
-            });
+            // 👑 ปรับปรุง: ดึงไฟล์ hydrangea1.glb (ตรงตามที่คุณส่งให้แป๊ะๆ)
+            // พร้อมใส่ตัวดักจับเช็กสถานะการดาวน์โหลดเพื่อป้องกันการเกิด Error สีแดงมั่วๆ
+            const modelName = 'hydrangea.glb'; 
+
+            fetch(modelName)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`หาไฟล์ "${modelName}" ไม่เจอ! (รหัสโฮสต์เตือน: ${response.status}) กรุณาเช็กว่าชื่อไฟล์พิมพ์เล็กใหญ่ตรงกันไหม หรือวางไฟล์ไว้ในโฟลเดอร์เดียวกับเว็บหรือยัง`);
+                    }
+                    return response.blob();
+                })
+                .then(() => {
+                    // ถ้าเช็กผ่านว่ามีไฟล์อยู่จริง จึงสั่งให้ Three.js โหลดไฟล์เข้าฉาก
+                    loader.load(modelName, (gltf) => {
+                        myModel = gltf.scene;
+                        const box = new THREE.Box3().setFromObject(myModel);
+                        const center = box.getCenter(new THREE.Vector3());
+                        myModel.position.sub(center);
+                        myModel.scale.set(0, 0, 0);
+                        scene.add(myModel);
+                    }, undefined, (error) => {
+                        alert("ไฟล์ชำรุดหรือระบบถอดรหัสขัดข้องชั่วคราว: " + error.message);
+                    });
+                })
+                .catch(err => {
+                    // แสดงแจ้งเตือนบนหน้าจอทันทีถ้าหาไฟล์ไม่พบ
+                    alert("⚠️ เกิดข้อผิดพลาด: " + err.message);
+                });
 
             animate();
         }
@@ -196,12 +176,8 @@
         }
 
         const wrapper = document.getElementById('envelope-trigger');
-        const hint = document.getElementById('hint-text');
-
         wrapper.addEventListener('click', () => {
             wrapper.classList.add('open');
-            if(hint) hint.style.opacity = '0';
-
             setTimeout(() => {
                 wrapper.classList.add('slide-down');
                 document.getElementById('canvas-container').classList.remove('disable-click');
@@ -227,7 +203,7 @@
         }
 
         /* ======================================================== */
-        /* [โหมดบิ๊กเซอร์ไพรส์] พลูหัวใจพิกเซลยักษ์ 25x27 ไม่กระจายหลุดเฟรม */
+        /* [ระบบพลูพิกเซลหัวใจ] */
         /* ======================================================== */
         const canvas = document.getElementById('heart-rain-canvas');
         const ctx = canvas.getContext('2d');
@@ -236,81 +212,51 @@
         let isRainActive = false;
         let isNightMode = false;
 
-        const rainMatrix = [
-            [0, 1, 1, 0, 1, 1, 0],
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1],
-            [0, 1, 1, 1, 1, 1, 0],
-            [0, 0, 1, 1, 1, 0, 0],
-            [0, 0, 0, 1, 0, 0, 0]
-        ];
-
+        const rainMatrix = [[0,1,1,0,1,1,0],[1,1,1,1,1,1,1],[1,1,1,1,1,1,1],[0,1,1,1,1,1,0],[0,0,1,1,1,0,0],[0,0,0,1,0,0,0]];
         const fireworkMatrix = [
-            [0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
-            [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            [0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0],
+            [0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0],
+            [0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0],
+            [1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+            [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+            [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+            [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+            [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ];
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas); resizeCanvas();
 
         class PixelHeartGroup {
             constructor() {
-                this.x = Math.random() * (canvas.width - 30);
-                this.y = -30;
-                this.speed = Math.random() * 0.6 + 0.8;
-                this.pixelSize = 2;
-                this.spacing = this.pixelSize + 1.5;
-                this.glow = 18;
-                this.opacity = 1;
+                this.x = Math.random() * (canvas.width - 30); this.y = -30;
+                this.speed = Math.random() * 0.6 + 0.8; this.pixelSize = 2; this.spacing = this.pixelSize + 1.5;
+                this.glow = 18; this.opacity = 1;
             }
-
             update() {
                 this.y += this.speed;
-                if (this.y > canvas.height * 0.6) {
-                    if (this.glow > 0) this.glow -= 0.04;
-                }
-                if (this.y > canvas.height * 0.85) {
-                    this.opacity -= 0.015;
-                }
+                if (this.y > canvas.height * 0.6 && this.glow > 0) this.glow -= 0.04;
+                if (this.y > canvas.height * 0.85) this.opacity -= 0.015;
             }
-
             draw() {
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, this.opacity);
-                ctx.shadowBlur = this.glow;
-                ctx.shadowColor = '#ff4d6d';
-                ctx.fillStyle = '#ffffff';
-
-                for (let row = 0; row < rainMatrix.length; row++) {
-                    for (let col = 0; col < rainMatrix[row].length; col++) {
-                        if (rainMatrix[row][col] === 1) {
-                            let px = this.x + (col * this.spacing);
-                            let py = this.y + (row * this.spacing);
-                            ctx.fillRect(px, py, this.pixelSize, this.pixelSize);
-                        }
+                ctx.save(); ctx.globalAlpha = Math.max(0, this.opacity); ctx.shadowBlur = this.glow;
+                ctx.shadowColor = '#ff4d6d'; ctx.fillStyle = '#ffffff';
+                for (let r = 0; r < rainMatrix.length; r++) {
+                    for (let c = 0; c < rainMatrix[r].length; c++) {
+                        if (rainMatrix[r][c] === 1) ctx.fillRect(this.x + (c * this.spacing), this.y + (r * this.spacing), this.pixelSize, this.pixelSize);
                     }
                 }
                 ctx.restore();
@@ -319,124 +265,69 @@
 
         class FireworkParticle {
             constructor(startX, startY, targetX, targetY) {
-                this.x = startX;
-                this.y = startY;
-                let forceMultiplier = Math.random() * 0.02 + 0.035;
-                this.vx = (targetX - startX) * forceMultiplier;
-                this.vy = (targetY - startY) * forceMultiplier;
-                this.pixelSize = 5.5;
-                this.glow = 55;
-                this.opacity = 1;
-                this.life = 1.0;
-                this.decay = Math.random() * 0.005 + 0.005;
+                this.x = startX; this.y = startY;
+                let force = Math.random() * 0.02 + 0.035;
+                this.vx = (targetX - startX) * force; this.vy = (targetY - startY) * force;
+                this.pixelSize = 5.5; this.glow = 55; this.opacity = 1; this.life = 1.0; this.decay = Math.random() * 0.005 + 0.005;
             }
-
             update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.vy += 0.008;
-                this.vx *= 0.935;
-                this.vy *= 0.935;
-                this.life -= this.decay;
-                this.opacity = this.life;
-                if (this.glow > 0) this.glow -= 0.08;
+                this.x += this.vx; this.y += this.vy; this.vy += 0.008; this.vx *= 0.935; this.vy *= 0.935;
+                this.life -= this.decay; this.opacity = this.life; if (this.glow > 0) this.glow -= 0.08;
             }
-
             draw() {
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, this.opacity);
-                ctx.shadowBlur = this.glow;
-                ctx.shadowColor = '#ff4d6d';
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(this.x, this.y, this.pixelSize, this.pixelSize);
-                ctx.restore();
+                ctx.save(); ctx.globalAlpha = Math.max(0, this.opacity); ctx.shadowBlur = this.glow;
+                ctx.shadowColor = '#ff4d6d'; ctx.fillStyle = '#ffffff'; ctx.fillRect(this.x, this.y, this.pixelSize, this.pixelSize); ctx.restore();
             }
         }
 
         function spawnGiganticFirework(x, y) {
-            const bigSpacing = 20;
-            for (let row = 0; row < fireworkMatrix.length; row++) {
-                for (let col = 0; col < fireworkMatrix[row].length; col++) {
-                    if (fireworkMatrix[row][col] === 1) {
-                        let offsetX = (col - 13) * bigSpacing;
-                        let offsetY = (row - 10) * bigSpacing;
-                        fireworksParticles.push(
-                            new FireworkParticle(x, y, x + offsetX, y + offsetY)
-                        );
-                    }
+            const spacing = 20;
+            for (let r = 0; r < fireworkMatrix.length; r++) {
+                for (let c = 0; c < fireworkMatrix[r].length; c++) {
+                    if (fireworkMatrix[r][c] === 1) fireworksParticles.push(new FireworkParticle(x, y, x + (c - 13) * spacing, y + (r - 10) * spacing));
                 }
             }
         }
 
         function activateFireworkTrigger() {
-            const clickTarget = document.getElementById('canvas-container');
-            clickTarget.addEventListener('click', (e) => {
+            document.getElementById('canvas-container').addEventListener('click', (e) => {
                 if (!isModelReady || hasClickedFirework) return;
-
-                hasClickedFirework = true;
-                isNightMode = true;
+                hasClickedFirework = true; isNightMode = true;
                 document.body.style.backgroundColor = '#000000';
                 spawnGiganticFirework(e.clientX, e.clientY);
 
                 let text = document.createElement('h1');
                 text.innerText = "Happy Anniversary";
-                text.style.position = 'absolute';
-                text.style.top = '50%';
-                text.style.left = '50%';
-                text.style.transform = 'translate(-50%, -50%)';
-                text.style.color = '#ff4d6d';
-                text.style.fontFamily = "'Doto', monospace";
-                text.style.zIndex = '100';
+                text.style.position = 'absolute'; text.style.top = '50%'; text.style.left = '50%';
+                text.style.transform = 'translate(-50%, -50%)'; text.style.color = '#ff4d6d';
+                text.style.fontFamily = "'Doto', monospace"; text.style.zIndex = '100';
                 document.body.appendChild(text);
-
-                setTimeout(() => {
-                    if(text.parentNode) {
-                        document.body.removeChild(text);
-                    }
-                }, 3000);
+                setTimeout(() => { if(text.parentNode) document.body.removeChild(text); }, 3000);
             });
         }
 
         function loopPixelRain() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (let i = fireworksParticles.length - 1; i >= 0; i--) {
-                fireworksParticles[i].update();
-                fireworksParticles[i].draw();
-                if (fireworksParticles[i].life <= 0) {
-                    fireworksParticles.splice(i, 1);
-                }
+                fireworksParticles[i].update(); fireworksParticles[i].draw();
+                if (fireworksParticles[i].life <= 0) fireworksParticles.splice(i, 1);
             }
-            if (isNightMode && fireworksParticles.length === 0) {
-                isNightMode = false;
-                document.body.style.backgroundColor = '#000000';
-                isRainActive = true;
-            }
+            if (isNightMode && fireworksParticles.length === 0) { isNightMode = false; isRainActive = true; }
             if (isRainActive) {
-                if (Math.random() < 0.18) {
-                    pixelHearts.push(new PixelHeartGroup());
-                }
+                if (Math.random() < 0.18) pixelHearts.push(new PixelHeartGroup());
                 for (let i = pixelHearts.length - 1; i >= 0; i--) {
-                    pixelHearts[i].update();
-                    pixelHearts[i].draw();
-                    if (pixelHearts[i].opacity <= 0 || pixelHearts[i].y > canvas.height + 40) {
-                        pixelHearts.splice(i, 1);
-                    }
+                    pixelHearts[i].update(); pixelHearts[i].draw();
+                    if (pixelHearts[i].opacity <= 0 || pixelHearts[i].y > canvas.height + 40) pixelHearts.splice(i, 1);
                 }
             }
             requestAnimationFrame(loopPixelRain);
         }
-
         requestAnimationFrame(loopPixelRain);
 
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
-        // รันระบบ 3D ทันที
-        init3D();
     </script>
 </body>
-
 </html>
